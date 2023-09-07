@@ -82,10 +82,21 @@ def image_press(template, colddown=0.5, target="tmp.png"):
     time.sleep(0.25)
     return False
 
+
 def stamina_recover():
     while True:
         adb_screenshot()
-        if image_exists("tmp.png", "data/stamina_small.png"):
+        if image_exists("tmp.png", "data/use.png"):
+            pos = image_to_pos("tmp.png", "data/use.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/ok.png"):
+            pos = image_to_pos("tmp.png", "data/ok.png")
+            adb_click(pos)
+            return
+        elif image_exists("tmp.png", "data/stamina_limited.png"):
+            pos = image_to_pos("tmp.png", "data/stamina_limited.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/stamina_small.png"):
             pos = image_to_pos("tmp.png", "data/stamina_small.png")
             adb_click(pos)
         elif image_exists("tmp.png", "data/stamina_mid.png"):
@@ -94,14 +105,8 @@ def stamina_recover():
         elif image_exists("tmp.png", "data/stamina_large.png"):
             pos = image_to_pos("tmp.png", "data/stamina_large.png")
             adb_click(pos)
-        elif image_exists("tmp.png", "data/use.png"):
-            pos = image_to_pos("tmp.png", "data/use.png")
-            adb_click(pos)
-        elif image_exists("tmp.png", "data/ok.png"):
-            pos = image_to_pos("tmp.png", "data/ok.png")
-            adb_click(pos)
-            return
         time.sleep(0.2)
+
 
 def main():
     state = 0
@@ -110,7 +115,10 @@ def main():
     battle_rounds = 0
     battle_rounds_failure = 0
     program_start_time = time.time()
+    combo_tap = False
     print("等待进入主界面。")
+    if combo_tap:
+        print("注意：启用了连击。")
     while state >= 0:
         bad = adb_screenshot()
         if state == 0:  # Waiting for main page.
@@ -160,14 +168,14 @@ def main():
                     continue
                 state = 10
             # Else if quest clear
-            elif image_exists("tmp.png", "data/quest_clear.png") or (
-                not image_exists("tmp.png", "data/battle_indicator.png")
-            ):
+            elif image_exists("tmp.png", "data/quest_clear.png"):
                 print(
                     f"QUEST CLEAR ! Time used: {time.time() - battle_start_time:.2f}s"
                 )
                 state = 3
-            time.sleep(0.5)
+            elif combo_tap:
+                adb_click([300, 300])
+            time.sleep(0.25)
         elif state == 3:  # Clear stage
             if image_exists("tmp.png", "data/continue.png"):
                 # Disable show if enabled.
@@ -207,9 +215,11 @@ def main():
                     print(
                         f"平均速度为 {(time.time() - program_start_time)/(battle_rounds - 1 - battle_rounds_failure):.2f} 秒/轮。"
                     )
+                if combo_tap:
+                    adb_click([300, 300])
             elif image_exists("tmp.png", "data/stamina_low.png"):
                 stamina_recover()
-            time.sleep(0.5)
+            time.sleep(0.25)
         else:
             time.sleep(0.75)
 
@@ -217,7 +227,7 @@ def main():
 if __name__ == "__main__":
     print("Script intializing.")
     # adb_addr = input("ADB Address:")
-    adb_addr = 16384  # ADB Address/Port
+    adb_addr = 21543  # ADB Address/Port
     bad = adb_connect(adb_addr)
     if bad:
         exit()
