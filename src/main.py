@@ -60,7 +60,7 @@ def image_to_pos(target, template):
     result = cv2.matchTemplate(targ_img, temp_img, cv2.TM_CCOEFF_NORMED)
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
     # print("prob:", max_val)
-    if max_val > 0.98:
+    if max_val > 0.95:
         center = (max_loc[0] + image_w / 2, max_loc[1] + image_h / 2)
         return center
     else:
@@ -82,6 +82,26 @@ def image_press(template, colddown=0.5, target="tmp.png"):
     time.sleep(0.25)
     return False
 
+def stamina_recover():
+    while True:
+        adb_screenshot()
+        if image_exists("tmp.png", "data/stamina_small.png"):
+            pos = image_to_pos("tmp.png", "data/stamina_small.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/stamina_mid.png"):
+            pos = image_to_pos("tmp.png", "data/stamina_mid.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/stamina_large.png"):
+            pos = image_to_pos("tmp.png", "data/stamina_large.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/use.png"):
+            pos = image_to_pos("tmp.png", "data/use.png")
+            adb_click(pos)
+        elif image_exists("tmp.png", "data/ok.png"):
+            pos = image_to_pos("tmp.png", "data/ok.png")
+            adb_click(pos)
+            return
+        time.sleep(0.2)
 
 def main():
     state = 0
@@ -97,12 +117,10 @@ def main():
             pos = image_to_pos("tmp.png", "data/raid_event_main.png")
             if pos != False:
                 print("检测到已经进入主界面。")
-                # print(pos)
                 # Switch to HELL Difficulty.
                 pos = image_to_pos("tmp.png", "data/raid_event_hell_diff.png")
                 if pos != False:
                     print("切换到准备界面。")
-                    # print(pos)
                     adb_click(pos)
                     state = 1
                 else:
@@ -124,8 +142,6 @@ def main():
                     adb_click(pos)
                     # Switch to battle waiting state.
                     state = 10
-            # else:
-            #     print("等待进入准备界面。")
             time.sleep(0.25)
         elif state == 2:  # Battle State
             # If jump back to prepare state (Game over)
@@ -133,8 +149,6 @@ def main():
                 state = 1
             # Else if time limit exceeds
             elif time.time() - battle_start_time > BATTLE_TIME_THRESHOLD:
-                # if (image_exists("tmp.png", "data/raid_event_hp_check.png")
-                #     or time.time() - battle_start_time > BATTLE_TIME_LAST_RESORT):
                 print("超时，重试战斗。")
                 battle_rounds_failure += 1
                 # Battle retry.
@@ -149,7 +163,9 @@ def main():
             elif image_exists("tmp.png", "data/quest_clear.png") or (
                 not image_exists("tmp.png", "data/battle_indicator.png")
             ):
-                print(f"QUEST CLEAR ! Time used: {time.time() - battle_start_time:.2f}s")
+                print(
+                    f"QUEST CLEAR ! Time used: {time.time() - battle_start_time:.2f}s"
+                )
                 state = 3
             time.sleep(0.5)
         elif state == 3:  # Clear stage
@@ -188,7 +204,11 @@ def main():
                 print(f"目前通过共 {battle_rounds - 1 - battle_rounds_failure} 轮。")
                 print(f"总耗时为 {time.time() - program_start_time:.2f}s。")
                 if battle_rounds - 1 - battle_rounds_failure > 0:
-                        print(f"平均速度为 {(time.time() - program_start_time)/(battle_rounds - 1 - battle_rounds_failure):.2f} 秒/轮。")
+                    print(
+                        f"平均速度为 {(time.time() - program_start_time)/(battle_rounds - 1 - battle_rounds_failure):.2f} 秒/轮。"
+                    )
+            elif image_exists("tmp.png", "data/stamina_low.png"):
+                stamina_recover()
             time.sleep(0.5)
         else:
             time.sleep(0.75)
@@ -204,8 +224,3 @@ if __name__ == "__main__":
 
     print("Script Initialized. Start main program.")
     main()
-
-    # print("Trying to take a screenshot.")
-    # bad = adb_screenshot()
-    # if bad:
-    #     exit()
