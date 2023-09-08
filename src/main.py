@@ -55,7 +55,7 @@ def adb_click(center, rand_range=7):
     adb_run(f"shell input tap {x} {y}")
 
 
-def image_to_pos(target, template, type = cv2.TM_CCOEFF_NORMED):
+def image_to_pos(target, template, type=cv2.TM_CCOEFF_NORMED):
     targ_img = cv2.imread(target)
     temp_img = cv2.imread(template)
     assert (
@@ -85,7 +85,7 @@ def image_to_pos(target, template, type = cv2.TM_CCOEFF_NORMED):
             return False
 
 
-def image_exists(target, template, type = cv2.TM_CCOEFF_NORMED):
+def image_exists(target, template, type=cv2.TM_CCOEFF_NORMED):
     pos = image_to_pos(target, template, type)
     return pos != False
 
@@ -100,10 +100,17 @@ def image_press(template, colddown=0.5, target=_temp_path):
     time.sleep(0.25)
     return False
 
+def general_check():
+    if image_exists(_temp_path, "data/ok.png"):
+        adb_click(__last_pos)
+    else:
+        adb_click([360, 640])
 
 def stamina_recover():
     while True:
         adb_screenshot()
+        if error_check():
+            return
         if image_exists(_temp_path, "data/use.png"):
             pos = __last_pos
             adb_click(pos)
@@ -123,26 +130,31 @@ def stamina_recover():
         elif image_exists(_temp_path, "data/stamina_large.png"):
             pos = __last_pos
             adb_click(pos)
+        else:
+            print("未检测到目标。体力可能已经全部耗尽。")
         time.sleep(0.2)
 
 
 def string_get_digits(_string):
-    return ''.join(list(filter(str.isdigit, _string)))
+    return "".join(list(filter(str.isdigit, _string)))
 
 
 def acquire_bonus():
     print("进入无限池页面。")
     while True:
         adb_screenshot()
+        if error_check():
+            return
         if image_exists(_temp_path, "data/refresh_pool.png"):
-            print("重置无限池。")
             pos = __last_pos
             adb_click(pos)
         elif image_exists(_temp_path, "data/ok.png"):
             pos = __last_pos
             adb_click(pos)
+        elif image_exists(_temp_path, "data/close.png"):
+            pos = __last_pos
+            adb_click(pos)
         elif image_exists(_temp_path, "data/gacha.png", cv2.TM_SQDIFF_NORMED):
-            print("抽取无限池。")
             pos = __last_pos
             adb_click(pos)
         elif image_exists(_temp_path, "data/bonus_indicator.png"):
@@ -155,40 +167,56 @@ def acquire_bonus():
             if coin_remain != "" and int(coin_remain) < 10:
                 image_press("data/back.png")
         elif image_exists(_temp_path, "data/raid_event_main.png"):
-            print("无限池币数目不足。返回主页面。")
             return
         time.sleep(0.25)
 
+def error_check():
+    if image_exists(_temp_path, "data/date_change.png"):
+        print("检测到日期改变。")
+        return True
+    if image_exists(_temp_path, "data/start_page.png"):
+        print("检测到退回主页面。")
+        return True
+    if image_exists(_temp_path, "data/error_0.png"):
+        print("检测到联网错误。")
+        return True
+    return False
 
-def main():
+def raid_event():
     state = 0
     battle_start_time = 0
     BATTLE_TIME_THRESHOLD = 30
+    BONUS_ROUND = 100
     battle_rounds = 0
     battle_rounds_failure = 0
     program_start_time = time.time()
     auto_tap = False
     goto_bonus = True
-    print("等待进入主界面。")
+    print("进入 RAID EVENT 活动主界面。")
     if auto_tap:
         print("注意：启用了连击。")
     while state >= 0:
         bad = adb_screenshot()
+        if error_check():
+            return
         if state == 0:  # Waiting for main page.
             pos = image_to_pos(_temp_path, "data/raid_event_main.png")
             if pos != False:
                 print("检测到已经进入主界面。")
                 if goto_bonus:
-                    while not image_press("data/bonus.png"):
-                        continue
-                    acquire_bonus()
-                    goto_bonus = False
+                    pos = image_to_pos(_temp_path, "data/bonus.png")
+                    if pos != False:
+                        adb_click(pos)
+                        time.sleep(0.2)
+                        acquire_bonus()
+                        goto_bonus = False
                 # Goto prepare page.
-                pos = image_to_pos(_temp_path, "data/raid_event_hell_diff.png")
-                if pos != False:
-                    print("切换到准备界面。")
-                    adb_click(pos)
-                    state = 1
+                else:
+                    pos = image_to_pos(_temp_path, "data/raid_event_hell_diff.png")
+                    if pos != False:
+                        print("切换到准备界面。")
+                        adb_click(pos)
+                        state = 1
             pos = image_to_pos(_temp_path, "data/close.png")
             if pos != False:
                 adb_click(pos)
@@ -200,7 +228,11 @@ def main():
                 if pos != False:
                     print("检测到自动模式关闭。打开自动模式。")
                     adb_click(pos)
-                    time.sleep(0.75)
+                    time.sleep(0.2)
+                # if image_exists(_temp_path, "data/auto_continue_disabled.png"):
+                #     print("检测到自动续战关闭。打开自动续战。")
+                #     adb_click(__last_pos)
+                #     time.sleep(0.2)
                 pos = image_to_pos(_temp_path, "data/raid_event_go.png")
                 if pos != False:
                     adb_click(pos)
@@ -215,14 +247,7 @@ def main():
             elif time.time() - battle_start_time > BATTLE_TIME_THRESHOLD:
                 print("超时，重试战斗。")
                 battle_rounds_failure += 1
-                # Battle retry.
-                while not image_press("data/pause.png"):
-                    continue
-                while not image_press("data/battle_retry.png"):
-                    continue
-                while not image_press("data/ok.png"):
-                    continue
-                state = 10
+                state = 4
             # Else if quest clear
             elif image_exists(_temp_path, "data/quest_clear.png"):
                 print(
@@ -231,8 +256,8 @@ def main():
                 # Every 100 rounds get to bonus page
                 if (
                     battle_rounds - battle_rounds_failure
-                ) % 100 == 0 and battle_rounds - battle_rounds_failure > 0:
-                    print("准备前往领取奖励。")
+                ) % BONUS_ROUND == 0 and battle_rounds - battle_rounds_failure > 0:
+                    print(f"检测到已经通过 {BONUS_ROUND} 轮。准备前往领取奖励。")
                     goto_bonus = True
                 state = 3
             elif auto_tap:
@@ -252,7 +277,9 @@ def main():
                 adb_click(pos)
                 state = 0
                 print("结算完毕，前往领取奖励。")
-            elif not goto_bonus and image_exists(_temp_path, "data/retry_after_success.png"):
+            elif not goto_bonus and image_exists(
+                _temp_path, "data/retry_after_success.png"
+            ):
                 pos = __last_pos
                 adb_click(pos)
                 state = 1
@@ -265,8 +292,16 @@ def main():
                 battle_rounds_failure += 1
                 state = 1
             else:
-                adb_click([300, 300])  # Speedup screen
+                general_check()  # Speedup screen
             time.sleep(0.2)
+        elif state == 4:  # Battle retrying State
+            if image_exists(_temp_path, "data/pause.png") or image_exists(
+                _temp_path, "data/battle_retry.png"
+            ):
+                adb_click(__last_pos)
+            elif image_exists(_temp_path, "data/ok.png"):
+                adb_click(__last_pos)
+                state = 10
         elif state == 10:  # Battle Waiting State
             if image_exists(_temp_path, "data/battle_indicator.png"):
                 state = 2
@@ -291,13 +326,63 @@ def main():
             time.sleep(0.75)
 
 
+def main():
+    target = "RAID"
+    target_state = 1
+
+    # Decide target page
+    if target == "RAID":
+        target_state = 1
+
+    state = 0
+    print("进入主程序。")
+    while True:
+        adb_screenshot()
+        if state == 0:  # If on main page
+            # Page check & State switch
+            if image_exists(_temp_path, "data/raid_event_main.png"):
+                raid_event()
+            elif image_exists(_temp_path, "data/events_main.png"):
+                print("进入活动页面。")
+                state = 1
+            # If on main page
+            elif (
+                image_exists(_temp_path, "data/close.png")
+                or image_exists(_temp_path, "data/close_red.png")
+                or image_exists(_temp_path, "data/ok.png")
+                or image_exists(_temp_path, "data/give_up.png")
+                or image_exists(_temp_path, "data/back.png")
+            ):
+                adb_click(__last_pos)
+            else:
+                if target_state == 1 and image_exists(_temp_path, "data/events.png"):
+                    adb_click(__last_pos)
+                else:
+                    adb_click([1024 / 2, 768 / 2])
+        elif state == 1:  # If on event page
+            if target == "RAID" and image_exists(
+                _temp_path, "data/raid_event_banner.png"
+            ):
+                adb_click(__last_pos)
+                raid_event()
+            elif not image_exists(_temp_path, "data/events_main.png"):
+                print("离开了活动页面。回到主程序。")
+                state = 0
+            else:
+                print("警告 - 未检测到目标 / 未设定目标。")
+        time.sleep(0.5)
+
+
 if __name__ == "__main__":
     print("Script intializing.")
     # adb_addr = input("ADB Address:")
-    adb_addr = 21543  # ADB Address/Port
+    # adb_addr = 16384  # ADB Address/Port
+    adb_addr = 21543
+    # adb_addr = 16448
     bad = adb_connect(adb_addr)
     if bad:
         exit()
 
     print("Script Initialized. Start main program.")
-    main()
+    while True:
+        main()
