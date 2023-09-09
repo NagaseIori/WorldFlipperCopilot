@@ -9,7 +9,8 @@ from PIL import Image
 
 __last_pos = False
 _temp_path = "temp/temp.png"
-
+battle_rounds = 0
+battle_rounds_failure = 0
 
 def adb_run(serial_num, command):
     return subprocess.run(
@@ -100,11 +101,13 @@ def image_press(template, colddown=0.5, target=_temp_path):
     time.sleep(0.25)
     return False
 
+
 def general_check():
     if image_exists(_temp_path, "data/ok.png"):
         adb_click(__last_pos)
     else:
         adb_click([360, 640])
+
 
 def stamina_recover():
     while True:
@@ -130,8 +133,6 @@ def stamina_recover():
         elif image_exists(_temp_path, "data/stamina_large.png"):
             pos = __last_pos
             adb_click(pos)
-        else:
-            print("未检测到目标。体力可能已经全部耗尽。")
         time.sleep(0.2)
 
 
@@ -170,6 +171,7 @@ def acquire_bonus():
             return
         time.sleep(0.25)
 
+
 def error_check():
     if image_exists(_temp_path, "data/date_change.png"):
         print("检测到日期改变。")
@@ -182,16 +184,21 @@ def error_check():
         return True
     return False
 
+
 def raid_event():
     state = 0
     battle_start_time = 0
     BATTLE_TIME_THRESHOLD = 30
     BONUS_ROUND = 100
-    battle_rounds = 0
-    battle_rounds_failure = 0
+    global battle_rounds
+    global battle_rounds_failure
     program_start_time = time.time()
     auto_tap = False
     goto_bonus = True
+    auto_close_at_beginning = False
+    auto_close_timer = 0
+    AUTO_CLOSE_TIME = 1.0
+    AUTO_POSITION = (44, 189)
     print("进入 RAID EVENT 活动主界面。")
     if auto_tap:
         print("注意：启用了连击。")
@@ -240,6 +247,15 @@ def raid_event():
                     state = 10
             time.sleep(0.25)
         elif state == 2:  # Battle State
+            # Auto close for one sec
+            if auto_close_at_beginning:
+                if auto_close_timer == 0:
+                    if image_exists(_temp_path, "data/auto_enabled_x1.png"):
+                        adb_click(__last_pos)
+                    elif image_exists(_temp_path, "data/auto_disabled_x0.png"):
+                        auto_close_timer = time.time()
+                elif time.time() - auto_close_timer > AUTO_CLOSE_TIME and image_exists(_temp_path, "data/auto_disabled_x0.png"):
+                    adb_click(__last_pos)
             # If jump back to prepare state (Game over)
             if image_exists(_temp_path, "data/raid_event_hell_prepare.png"):
                 state = 1
@@ -249,7 +265,9 @@ def raid_event():
                 battle_rounds_failure += 1
                 state = 4
             # Else if quest clear
-            elif image_exists(_temp_path, "data/quest_clear.png"):
+            elif image_exists(_temp_path, "data/quest_clear.png") or image_exists(
+                _temp_path, "data/quest_clear_2.png"
+            ):
                 print(
                     f"QUEST CLEAR ! Time used: {time.time() - battle_start_time:.2f}s"
                 )
@@ -302,11 +320,13 @@ def raid_event():
             elif image_exists(_temp_path, "data/ok.png"):
                 adb_click(__last_pos)
                 state = 10
+            time.sleep(0.1)
         elif state == 10:  # Battle Waiting State
             if image_exists(_temp_path, "data/battle_indicator.png"):
                 state = 2
                 battle_start_time = time.time()
                 battle_rounds += 1
+                auto_close_timer = 0
                 failure_rate = 0.0
                 if battle_rounds > 1:
                     failure_rate = battle_rounds_failure / (battle_rounds - 1) * 100
@@ -376,8 +396,8 @@ def main():
 if __name__ == "__main__":
     print("Script intializing.")
     # adb_addr = input("ADB Address:")
-    # adb_addr = 16384  # ADB Address/Port
-    adb_addr = 21543
+    adb_addr = 16384  # ADB Address/Port
+    # adb_addr = 21543
     # adb_addr = 16448
     bad = adb_connect(adb_addr)
     if bad:
