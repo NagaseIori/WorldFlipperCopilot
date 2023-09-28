@@ -2,3 +2,4 @@ WFC
 .vscode
 tmp*
 temp
+config.json

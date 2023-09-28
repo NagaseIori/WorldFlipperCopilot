@@ -1,0 +1,18 @@
+{
+    "devices": [
+        {
+            "address": "127.0.0.1:11451",
+            "tasks": [
+                {
+                    "type": "RAID",
+                    "auto_tap": false,
+                    "auto_close": {
+                        "enabled": true,
+                        "time": 1.25
+                    },
+                    "bonus_round": 100
+                }
+            ]
+        }
+    ]
+}
