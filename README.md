@@ -15,3 +15,9 @@ Double click `run.py` or use the commands below:
 ```
 python run.py
 ```
+
+## Configuartion
+
+Create `config.json` under the root directory.
+
+See `config_template.json` for the example.
