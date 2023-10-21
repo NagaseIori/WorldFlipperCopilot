@@ -10,6 +10,8 @@ You should also install `tesseract` and add it to your PATH. To check if you've 
 
 ## Usage
 
+Double click `run.py` or use the commands below:
+
 ```
-python src/main.py
+python run.py
 ```
