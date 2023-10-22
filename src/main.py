@@ -156,7 +156,8 @@ def string_get_digits(_string):
 
 def acquire_bonus():
     output_log("进入无限池页面。")
-    getIn = False
+    finished = False
+    ensurance = 0
     while True:
         adb_screenshot()
         if error_check():
@@ -183,8 +184,13 @@ def acquire_bonus():
             coin_remain = string_get_digits(content)
             if coin_remain != "" and int(coin_remain) < 10:
                 image_press("data/back.png")
-        elif getIn and not image_exists(_temp_path, "data/bonus_indicator_type2.png"):
-            return
+                finished = True
+        elif finished and not image_exists(
+            _temp_path, "data/bonus_indicator_type2.png"
+        ):
+            ensurance += 1
+            if ensurance > 3:
+                return
         time.sleep(0.25)
 
 
@@ -447,7 +453,7 @@ def story_events(tconfig):
     program_start_time = time.time()
     # auto_tap = False
     auto_tap = tconfig.get("auto_tap", False)
-    goto_bonus = False
+    goto_bonus = not __DEBUG
     recruited = False
 
     auto_close_timer = 0
@@ -578,14 +584,11 @@ def story_events(tconfig):
                 adb_click(__last_pos)
                 state = 0
                 output_log("结算完毕，前往领取奖励。")
-            elif goto_bonus and (
-                image_exists(_temp_path, "data/cancel.png")
-            ):
+            elif goto_bonus and (image_exists(_temp_path, "data/cancel.png")):
                 adb_click(__last_pos)
             elif not goto_bonus and image_exists(_temp_path, "data/back_to_room.png"):
                 pos = __last_pos
                 adb_click(pos)
-                state = 1
                 output_log("结算完毕，回到准备界面。")
                 if limit_rounds > 0 and battle_rounds >= limit_rounds:
                     output_log("战斗达到限制上限。退出该任务。")
@@ -599,8 +602,6 @@ def story_events(tconfig):
                 output_log("回到准备界面。")
                 battle_rounds_failure += 1
                 state = 1
-            else:
-                general_check()  # Speedup screen
             time.sleep(0.5)
         elif state == 4:  # Battle retrying State
             if image_exists(_temp_path, "data/stage_clear.png"):
@@ -684,6 +685,7 @@ def main(dev_config):
                         or image_exists(_temp_path, "data/give_up.png")
                         or image_exists(_temp_path, "data/back.png")
                         or image_exists(_temp_path, "data/disband.png")
+                        or image_exists(_temp_path, "data/cancel.png")
                     ):
                         adb_click(__last_pos)
                     # If on main page
@@ -704,8 +706,8 @@ def main(dev_config):
                         break
                     elif target == "EVENTS":
                         targetEvent = task["settings"]["event"].lower()
-                        if targetEvent == "dawn" and image_exists(
-                            _temp_path, "data/event_dawn_banner.png"
+                        if image_exists(
+                            _temp_path, f"data/event_{targetEvent}_banner.png"
                         ):
                             adb_click(__last_pos)
                             time.sleep(1)
@@ -726,8 +728,8 @@ def main(dev_config):
 
 
 def dev_loop(dev):
-    while True:
-        main(dev)
+    main(dev)
+    output_log("所有任务执行完毕。退出程序。")
 
 
 import multiprocessing as mp
@@ -745,21 +747,20 @@ if __name__ == "__main__":
     print("Script Initialized. Start main program.")
 
     devices = config["devices"]
-    while True:
-        p_list = []
-        for dev in devices:
-            if dev.get("enabled", True):
-                dev.setdefault("tag", "unknown device")
-                try:
-                    bad = adb_connect(dev["address"])
-                    if bad:
-                        raise
-                except:
-                    print(f"Connect failed. Skip device {dev['tag']}")
-                    continue
-                print(f"Start subprocess of device {dev['tag']}")
-                p = mp.Process(target=dev_loop, args=(dev,))
-                p.start()
-                p_list.append(p)
-        for p in p_list:
-            p.join()
+    p_list = []
+    for dev in devices:
+        if dev.get("enabled", True):
+            dev.setdefault("tag", "unknown device")
+            try:
+                bad = adb_connect(dev["address"])
+                if bad:
+                    raise
+            except:
+                print(f"Connect failed. Skip device {dev['tag']}")
+                continue
+            print(f"Start subprocess of device {dev['tag']}")
+            p = mp.Process(target=dev_loop, args=(dev,))
+            p.start()
+            p_list.append(p)
+    for p in p_list:
+        p.join()
